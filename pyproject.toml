@@ -9,7 +9,11 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "dotenv>=0.9.9",
+    "fastapi>=0.141.1",
+    "fastapi-guard>=8.0.0",
+    "psycopg>=3.3.6",
     "requests>=2.34.2",
+    "sqlmodel>=0.0.45",
 ]
 
 [project.scripts]
