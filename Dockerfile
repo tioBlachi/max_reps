@@ -1,5 +1,7 @@
 FROM python:3.14-slim-trixie
 
+RUN pip install uv
+
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
