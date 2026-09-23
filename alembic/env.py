@@ -6,7 +6,7 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from sqlmodel import SQLModel
 
-from maxreps.backend.models.exercise import Exercise
+import maxreps.backend.models
 
 from alembic import context
 
