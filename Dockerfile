@@ -1,6 +1,6 @@
-FROM python:3.14-slim-trixie
+FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim
 
-RUN pip install uv
+# RUN pip install uv
 
 WORKDIR /app
 
