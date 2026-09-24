@@ -1,10 +1,15 @@
 import os
 
 from fastapi import FastAPI, status
-from guard import SecurityMiddleware, SecurityConfig, SecurityDecorator
+from guard import SecurityMiddleware, SecurityConfig
+from maxreps.backend.routes.exercise import router as exercise_router
 
 app = FastAPI(
     description='The backend for the MaxReps applicaiton',
+)
+
+app.include_router(
+    exercise_router
 )
 
 config = SecurityConfig(
@@ -16,6 +21,7 @@ config = SecurityConfig(
 )
 
 app.add_middleware(SecurityMiddleware, config=config)
+
 
 @app.get('/health', status_code=status.HTTP_200_OK)
 def check_health():
