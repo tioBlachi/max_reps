@@ -10,9 +10,13 @@ requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.20.0",
     "dotenv>=0.9.9",
+    "email-validator>=2.3.0",
     "fastapi>=0.141.1",
     "fastapi-guard>=8.0.0",
     "psycopg[binary]>=3.3.6",
+    "pwdlib[argon2]>=0.3.1",
+    "pyjwt>=2.15.0",
+    "python-multipart>=0.0.32",
     "requests>=2.34.2",
     "sqlmodel>=0.0.45",
 ]
