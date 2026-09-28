@@ -107,6 +107,10 @@ def login_user(
     access_token = create_access_token(user.id)
     return Token(access_token=access_token)
 
+# ----------- REACTIVATE USER ----------------
+@router.post(
+        '/reactivate',
+        response_model=Token)
 
 # ----------- GET CURRENT USER ---------------
 @router.get(

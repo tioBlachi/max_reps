@@ -1,7 +1,11 @@
 from uuid import UUID, uuid4
+from typing import TYPE_CHECKING
 
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Relationship
 from pydantic import EmailStr
+
+if TYPE_CHECKING:
+    from .lift_record import LiftRecord
 
 class UserBase(SQLModel):
     email : EmailStr = Field(index=True, unique=True)
@@ -35,3 +39,7 @@ class User(UserBase, table=True):
     hashed_password : str
     is_active : bool = Field(default=True)
     is_admin : bool = Field(default=False)
+    auth_version : int = Field(default=1, nullable=False)
+    lift_records: list["LiftRecord"] = Relationship(
+        back_populates="user",
+    )
