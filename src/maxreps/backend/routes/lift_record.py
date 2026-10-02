@@ -42,7 +42,10 @@ def to_public(record: LiftRecord, unit: WeightUnit)-> LiftRecordPublic:
         attempted_at=record.attempted_at,
         weight=from_kilograms(record.weight_kg, unit),
         unit=unit,
-        one_rep_max_est=from_kilograms(record.one_rep_max_est, unit),
+        one_rep_max_est=round(
+            from_kilograms(record.one_rep_max_est, unit),
+            2,
+        ),
     ) 
 
 

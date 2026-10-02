@@ -13,9 +13,9 @@ def epley(weight: float, reps: int) -> float:
         raise ValueError("Reps must be greater than zero")
 
     if reps == 1:
-        return weight
+        return round(weight, 2)
 
-    return weight * (1 + reps / 30)
+    return round(weight * (1 + reps / 30), 2)
 
 
 def pounds_to_kg(pounds: float) -> float:
