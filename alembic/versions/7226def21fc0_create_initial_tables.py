@@ -47,7 +47,7 @@ def upgrade() -> None:
     sa.Column('user_id', sa.Uuid(), nullable=False),
     sa.Column('exercise_id', sa.Integer(), nullable=False),
     sa.Column('weight_kg', sa.Float(), nullable=False),
-    sa.Column('one_rep_max_est', sa.Integer(), nullable=False),
+    sa.Column('one_rep_max_est', sa.Float(), nullable=False),
     sa.ForeignKeyConstraint(['exercise_id'], ['exercise.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')

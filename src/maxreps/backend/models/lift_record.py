@@ -45,7 +45,7 @@ class LiftRecord(LiftRecordBase, table=True):
     )
 
     weight_kg: float = Field(gt=0)
-    one_rep_max_est : int = Field(gt=0)
+    one_rep_max_est : float = Field(gt=0)
 
     user: "User" = Relationship(
         back_populates='lift_records'
