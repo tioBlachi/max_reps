@@ -9,7 +9,7 @@ from fastapi import (
     Depends
     )
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlmodel import select
 
 from maxreps.backend.dependencies.db import SessionDep
@@ -107,10 +107,6 @@ def login_user(
     access_token = create_access_token(user.id)
     return Token(access_token=access_token)
 
-# ----------- REACTIVATE USER ----------------
-@router.post(
-        '/reactivate',
-        response_model=Token)
 
 # ----------- GET CURRENT USER ---------------
 @router.get(
@@ -219,3 +215,36 @@ def deactivate_user(
 
     session.add(current_user)
     session.commit()
+
+
+# ----------- REACTIVATE USER ----------------
+@router.post(
+        '/reactivate',
+        response_model=Token,
+        description='Reactivates a user\'s account and sets their is_active to True in the database')
+def reactivate_user(
+    session: SessionDep,
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
+    normalized_email = form_data.username.strip().lower()
+
+    user = session.exec(
+            select(User).where(User.email == normalized_email)
+        ).first()
+
+    if user is None or not verify_password(
+        form_data.password,
+        user.hashed_password,):
+        raise CREDENTIALS_EXCEPTION
+
+    if not user.is_active:
+        user.is_active = True
+        session.add(user)
+
+    try:
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+
+    access_token = create_access_token(user.id)
+    return Token(access_token=access_token)
