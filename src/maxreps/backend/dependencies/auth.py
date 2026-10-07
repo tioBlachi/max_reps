@@ -25,13 +25,13 @@ def get_current_user(
         token: Annotated[str, Depends(oauth2_scheme)],
         ) -> User:
     try:
-        user_id = decode_access_token(token=token)
+        user_id, token_version = decode_access_token(token=token)
     except InvalidAccessTokenError as e:
         raise CREDENTIALS_EXCEPTION from e
 
     user = session.get(User, user_id)
 
-    if user is None:
+    if user is None or user.auth_version != token_version:
         raise CREDENTIALS_EXCEPTION
 
     return user

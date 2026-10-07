@@ -19,14 +19,18 @@ router = APIRouter(
 @router.get('/',
     response_model=list[ExerciseSummary],
     status_code=status.HTTP_200_OK,
-    description="Endpoint that returns name, category and id of all exercises in " \
-    "the database. Used to populate a frontend list of strings for autocomplete feature."
+    description=(
+        "Returns the name, category, and ID of all exercises for exercise selection "
+        "and frontend autocomplete.\n\n"
+        "Rate limited to:\n\n"
+        "- 60 requests per minute in production\n"
+        "- 60 requests per minute during development"
+    ),
     )
 @guard_deco.rate_limit(requests=60, window=60)
 def get_all_exercises(
     session: SessionDep,
 ) -> list[Exercise]:
-    '''This route will be used by the autocomplete feature on the front end'''
     statement = select(Exercise)
 
     exercises = session.exec(statement).all()
@@ -37,15 +41,18 @@ def get_all_exercises(
 @router.get('/{exercise_id}',
             response_model=ExercisePublic,
             status_code=status.HTTP_200_OK,
-            description="Endpoint that additionally returns instructions as a list of strings" \
-            "for a specific exercise id.")
+            description=(
+                "Returns an exercise's name, category, ID, and instructions by exercise ID. "
+                "Returns 404 if the exercise does not exist.\n\n"
+                "Rate limited to:\n\n"
+                "- 120 requests per minute in production\n"
+                "- 120 requests per minute during development"
+            ))
 @guard_deco.rate_limit(requests=120, window=60)
 def get_exercise(
     exercise_id: int,
     session: SessionDep
 ) -> Exercise:
-    '''This route will be used by the frontend when an exercise is selected
-    from the autocomplete options. Used to provide exercise instructions'''
     exercise = session.get(Exercise, exercise_id)
 
     if exercise is None:

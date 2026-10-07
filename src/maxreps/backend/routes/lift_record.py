@@ -24,10 +24,7 @@ from maxreps.backend.models.exercise import Exercise
 from maxreps.backend.dependencies.db import SessionDep
 from maxreps.backend.dependencies.auth import CurrentUser
 from maxreps.backend.models.enums import WeightUnit
-from maxreps.services.security import (
-    guard_deco,
-    rate_window,
-)
+from maxreps.services.security import guard_deco
 
 
 router = APIRouter(
@@ -54,7 +51,20 @@ def to_public(record: LiftRecord, unit: WeightUnit)-> LiftRecordPublic:
 
 
 # ---------- CREATE LIFT RECORD -------------
-@router.post('/', response_model=LiftRecordPublic, status_code=status.HTTP_201_CREATED)
+@router.post('/',
+             response_model=LiftRecordPublic,
+             status_code=status.HTTP_201_CREATED,
+             description=(
+                 "Creates a lift record for the authenticated active user and calculates "
+                 "an estimated one-rep max using the Epley formula. Returns weight and "
+                 "estimated max in the submitted unit, with the estimate rounded to two "
+                 "decimal places. Timestamps without a timezone are interpreted as UTC; "
+                 "timestamps with a timezone are converted to UTC. "
+                 "Returns 404 if the exercise does not exist.\n\n"
+                 "Rate limited to:\n\n"
+                 "- 30 requests per minute in production\n"
+                 "- 30 requests per minute during development"
+             ))
 @guard_deco.rate_limit(requests=30, window=60)
 def create_lift_record(session: SessionDep, lift_data: LiftRecordCreate, current_user: CurrentUser) -> LiftRecordPublic:
     # confirm that the exercise exists
@@ -106,7 +116,16 @@ def create_lift_record(session: SessionDep, lift_data: LiftRecordCreate, current
     '/',
     response_model=list[LiftRecordPublic],
     status_code=status.HTTP_200_OK,
-    description='Returns a list of lift records for a single exercise or all exercises attempted for the current user'
+    description=(
+        "Returns the authenticated active user's lift history, newest attempts first. "
+        "Supports an optional exercise ID filter and pagination using offset and limit "
+        "(default 20, maximum 100 records). Weight and estimated max are returned in "
+        "the requested unit, defaulting to pounds, with estimates rounded to two decimal "
+        "places. Returns an empty list if no records match.\n\n"
+        "Rate limited to:\n\n"
+        "- 60 requests per minute in production\n"
+        "- 60 requests per minute during development"
+    ),
     )
 @guard_deco.rate_limit(requests=60, window=60)
 def get_lift_records(
@@ -139,7 +158,15 @@ def get_lift_records(
     '/{lift_record_id}',
     response_model=LiftRecordPublic,
     status_code=status.HTTP_200_OK,
-    description='Returns a specific lift record by lift_record_id for the current user'
+    description=(
+        "Returns a lift record by its UUID for the authenticated active user. "
+        "Weight and estimated max are returned in the requested unit, defaulting to "
+        "pounds, with the estimate rounded to two decimal places. Returns 404 if the "
+        "record does not exist or belongs to another user.\n\n"
+        "Rate limited to:\n\n"
+        "- 60 requests per minute in production\n"
+        "- 60 requests per minute during development"
+    ),
 )
 @guard_deco.rate_limit(requests=60, window=60)
 def get_lift_record(

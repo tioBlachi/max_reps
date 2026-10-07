@@ -123,7 +123,8 @@ def login_user(
             detail="Inactive user",
         )
 
-    access_token = create_access_token(user.id)
+    access_token = create_access_token(user.id, auth_version=user.auth_version)
+
     return Token(access_token=access_token)
 
 
@@ -224,6 +225,8 @@ def update_user_password(
         )
 
     current_user.hashed_password = get_password_hash(update_data.new_password)
+    current_user.auth_version += 1
+
     session.add(current_user)
     session.commit()
 
@@ -256,6 +259,7 @@ def deactivate_user(
         )
         
     current_user.is_active = False
+    current_user.auth_version += 1
 
     session.add(current_user)
     session.commit()
@@ -272,7 +276,7 @@ def deactivate_user(
             "- 10 requests per 5 minutes in production\n"
             "- 10 requests per minute during development"
         ),
-        )
+    )
 @guard_deco.rate_limit(requests=10, window=rate_window(300))
 def reactivate_user(
     session: SessionDep,
@@ -303,4 +307,9 @@ def reactivate_user(
         session.rollback()
         raise
 
-    return Token(access_token=create_access_token(user.id))
+    return Token(
+        access_token=create_access_token(
+            user.id,
+            auth_version=user.auth_version,
+            )
+        )

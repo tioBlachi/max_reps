@@ -74,7 +74,11 @@ def get_password_hash(password : str) -> str:
 
 # __________JWT______________
 # Create JWT Token
-def create_access_token(user_id: UUID, expires_delta : timedelta | None = None) -> str:
+def create_access_token(
+        user_id: UUID,
+        auth_version: int,
+        expires_delta : timedelta | None = None
+        ) -> str:
     issued_at = datetime.now(timezone.utc)
 
     if expires_delta is not None:
@@ -87,6 +91,7 @@ def create_access_token(user_id: UUID, expires_delta : timedelta | None = None) 
 
     payload = {
         'sub': str(user_id),
+        'auth_version': auth_version,
         'iat': issued_at,
         'exp': expires_at,
     }
@@ -105,9 +110,20 @@ def decode_access_token(token: str) -> UUID:
             SECRET_KEY,
             algorithms=[ALGORITHM],
             options={
-                'require' : ['sub', 'iat', 'exp']
+                'require' : ['sub', 'auth-version', 'iat', 'exp']
             },
         )
-        return UUID(payload['sub'])
+
+        subject = payload['sub']
+        version = payload['auth_version']
+
+        if not isinstance(subject, str):
+            raise ValueError("Invalid token subject")
+
+        if type(version) is not int or version < 1:
+            raise ValueError("Invalid authentication version")
+        
+        return UUID(subject), version
+    
     except (InvalidTokenError, ValueError) as e:
         raise InvalidAccessTokenError from e
