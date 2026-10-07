@@ -4,8 +4,36 @@ from uuid import UUID
 
 import jwt
 from jwt.exceptions import InvalidTokenError
-
+from guard import (
+    SecurityConfig,
+    SecurityDecorator,
+)
 from pwdlib import PasswordHash
+
+# Setting up a rate window for testing during development
+APP_ENV = os.getenv("APP_ENV", "production")
+
+def rate_window(seconds: int) -> int:
+    return min(seconds, 60) if APP_ENV == 'development' else seconds
+
+# FastAPI Guard Setup
+config = SecurityConfig(
+    enable_rate_limiting=True,
+    rate_limit=120,
+    rate_limit_window=60,
+    enable_redis=True,
+    redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+    security_headers={
+        'enabled' : True,
+        'referrer_policy': (
+            'no-referrer'
+            if APP_ENV == 'development'
+            else "strict-origin-when-cross-origin"
+        )
+    }
+)
+
+guard_deco = SecurityDecorator(config=config)
 
 class InvalidAccessTokenError(Exception):
     '''This is raised when an access token cannot be validated.'''
@@ -44,7 +72,7 @@ def verify_password(plain_password : str, hashed_password : str) -> bool:
 def get_password_hash(password : str) -> str:
     return password_hash.hash(password)
 
-
+# __________JWT______________
 # Create JWT Token
 def create_access_token(user_id: UUID, expires_delta : timedelta | None = None) -> str:
     issued_at = datetime.now(timezone.utc)

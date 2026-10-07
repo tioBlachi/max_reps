@@ -29,6 +29,10 @@ from maxreps.services.security import (
     get_password_hash,
     )
 from maxreps.backend.dependencies.auth import CurrentUser
+from maxreps.services.security import (
+    guard_deco,
+    rate_window,
+)
 
 
 router = APIRouter(
@@ -41,9 +45,17 @@ router = APIRouter(
 @router.post(
     "",
     response_model=UserPublic,
-    description="Register a user and store a hash of their password.",
     status_code=status.HTTP_201_CREATED,
+    description=(
+        "Register a user and store a hash of their password.\n\n"
+        "Rate limited to:\n\n"
+        "- 3 requests per hour in production\n"
+        "- 3 requests per minute during development"
+    ),
+    
 )
+@guard_deco.require_ip(whitelist=['127.0.0.1', '172.18.0.1'])
+@guard_deco.rate_limit(requests=3, window=rate_window(3600))
 def register_user(session: SessionDep, user_data: UserCreate) -> User:
     normalized_email = str(user_data.email).strip().lower()
     user_in_db = session.exec(
@@ -81,8 +93,15 @@ def register_user(session: SessionDep, user_data: UserCreate) -> User:
     "/token",
     response_model=Token,
     status_code=status.HTTP_200_OK,
-    description='Logs user into the application and grants a JWT for the current session'
+    description=(
+        "Logs the user into the application and grants a JWT. "
+        "Token expiration is configured by ACCESS_TOKEN_EXPIRATION_MINUTES.\n\n"
+        "Rate limited to:\n\n"
+        "- 10 requests per 5 minutes in production\n"
+        "- 10 requests per minute during development"
+    ),
 )
+@guard_deco.rate_limit(requests=10, window=rate_window(300))
 def login_user(
     session: SessionDep,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
@@ -112,8 +131,14 @@ def login_user(
 @router.get(
     "/me",
     response_model=UserPublic,
-    description='Returns the current user. Information can be used to populate a user profile page or as needed'
+    description=(
+        "Returns the current user. Information can be used to populate a user profile page.\n\n"
+        "Rate limited to:\n\n"
+        "- 60 requests per minute in production\n"
+        "- 60 requests per minute during development"
+    ),
 )
+@guard_deco.rate_limit(requests=60, window=60)
 def get_my_profile(current_user: CurrentUser) -> User:
     return current_user
 
@@ -122,10 +147,15 @@ def get_my_profile(current_user: CurrentUser) -> User:
 @router.patch(
     "/me/email",
     response_model=UserPublic,
-    description='Updates the current user\'s email address.' \
-    'First validates that user\'s current password.' \
-    'Also verifies that the new email is not already registered in the database.'
+    description=(
+        "Updates the current user's email address after validating their current password "
+        "and verifying that the new email is not already registered.\n\n"
+        "Rate limited to:\n\n"
+        "- 5 requests per 10 minutes in production\n"
+        "- 5 requests per minute during development"
+    ),
 )
+@guard_deco.rate_limit(requests=5, window=rate_window(600))
 def update_user_email(
     session: SessionDep,
     update_data: UserEmailUpdate,
@@ -171,8 +201,14 @@ def update_user_email(
 @router.patch(
     "/me/password",
     status_code=status.HTTP_204_NO_CONTENT,
-    description='Updates the current user\s email after validating that user knows the current password'
+    description=(
+        "Updates the current user's password after validating their current password.\n\n"
+        "Rate limited to:\n\n"
+        "- 5 requests per 10 minutes in production\n"
+        "- 5 requests per minute during development"
+    ),
 )
+@guard_deco.rate_limit(requests=5, window=rate_window(600))
 def update_user_password(
     session: SessionDep,
     update_data: UserPasswordUpdate,
@@ -196,7 +232,15 @@ def update_user_password(
 @router.delete(
     "/me/deactivate",
     status_code=status.HTTP_204_NO_CONTENT,
+    description=(
+        "Deactivates the current user's account after validating their current password. "
+        "Sets is_active to False without deleting the user.\n\n"
+        "Rate limited to:\n\n"
+        "- 5 requests per 10 minutes in production\n"
+        "- 5 requests per minute during development"
+    ),
 )
+@guard_deco.rate_limit(requests=5, window=rate_window(600))
 def deactivate_user(
     session: SessionDep,
     confirm_data: UserDeactivate,
@@ -221,7 +265,15 @@ def deactivate_user(
 @router.post(
         '/reactivate',
         response_model=Token,
-        description='Reactivates a user\'s account and sets their is_active to True in the database')
+        description=(
+            "Reactivates an inactive account after verifying the user's email and password. "
+            "Sets is_active to True and returns a JWT.\n\n"
+            "Rate limited to:\n\n"
+            "- 10 requests per 5 minutes in production\n"
+            "- 10 requests per minute during development"
+        ),
+        )
+@guard_deco.rate_limit(requests=10, window=rate_window(300))
 def reactivate_user(
     session: SessionDep,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
@@ -236,9 +288,14 @@ def reactivate_user(
         user.hashed_password,):
         raise CREDENTIALS_EXCEPTION
 
-    if not user.is_active:
-        user.is_active = True
-        session.add(user)
+    if user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='Account is already active. Please log in.',
+        )
+
+    user.is_active = True
+    session.add(user)
 
     try:
         session.commit()
@@ -246,5 +303,4 @@ def reactivate_user(
         session.rollback()
         raise
 
-    access_token = create_access_token(user.id)
-    return Token(access_token=access_token)
+    return Token(access_token=create_access_token(user.id))

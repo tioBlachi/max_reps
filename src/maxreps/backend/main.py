@@ -1,7 +1,6 @@
-import os
-
 from fastapi import FastAPI, status
-from guard import SecurityMiddleware, SecurityConfig
+from guard import SecurityMiddleware
+from maxreps.services.security import config, guard_deco
 from maxreps.backend.routes.exercise import router as exercise_router
 from maxreps.backend.routes.user import router as user_router
 from maxreps.backend.routes.lift_record import router as lift_record_router
@@ -14,15 +13,9 @@ app.include_router(exercise_router)
 app.include_router(user_router)
 app.include_router(lift_record_router)
 
-config = SecurityConfig(
-    enable_rate_limiting=True,
-    rate_limit=3,
-    enable_redis=True,
-    redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-    passive_mode=True,
-)
-
 app.add_middleware(SecurityMiddleware, config=config)
+
+app.state.guard_decorator = guard_deco
 
 
 @app.get('/health', status_code=status.HTTP_200_OK)
