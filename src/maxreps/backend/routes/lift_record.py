@@ -24,6 +24,10 @@ from maxreps.backend.models.exercise import Exercise
 from maxreps.backend.dependencies.db import SessionDep
 from maxreps.backend.dependencies.auth import CurrentUser
 from maxreps.backend.models.enums import WeightUnit
+from maxreps.services.security import (
+    guard_deco,
+    rate_window,
+)
 
 
 router = APIRouter(
@@ -51,6 +55,7 @@ def to_public(record: LiftRecord, unit: WeightUnit)-> LiftRecordPublic:
 
 # ---------- CREATE LIFT RECORD -------------
 @router.post('/', response_model=LiftRecordPublic, status_code=status.HTTP_201_CREATED)
+@guard_deco.rate_limit(requests=30, window=60)
 def create_lift_record(session: SessionDep, lift_data: LiftRecordCreate, current_user: CurrentUser) -> LiftRecordPublic:
     # confirm that the exercise exists
     exercise = session.get(Exercise, lift_data.exercise_id)
@@ -103,6 +108,7 @@ def create_lift_record(session: SessionDep, lift_data: LiftRecordCreate, current
     status_code=status.HTTP_200_OK,
     description='Returns a list of lift records for a single exercise or all exercises attempted for the current user'
     )
+@guard_deco.rate_limit(requests=60, window=60)
 def get_lift_records(
     session: SessionDep,
     current_user: CurrentUser,
@@ -135,6 +141,7 @@ def get_lift_records(
     status_code=status.HTTP_200_OK,
     description='Returns a specific lift record by lift_record_id for the current user'
 )
+@guard_deco.rate_limit(requests=60, window=60)
 def get_lift_record(
     lift_record_id: UUID,
     session: SessionDep,

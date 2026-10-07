@@ -2,7 +2,13 @@ from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select
 
 from maxreps.backend.dependencies.db import SessionDep
-from maxreps.backend.models.exercise import Exercise, ExercisePublic, ExerciseSummary
+from maxreps.backend.models.exercise import (
+    Exercise,
+    ExercisePublic,
+    ExerciseSummary,
+)
+from maxreps.services.security import guard_deco
+
 
 router = APIRouter(
     prefix='/exercises',
@@ -16,24 +22,12 @@ router = APIRouter(
     description="Endpoint that returns name, category and id of all exercises in " \
     "the database. Used to populate a frontend list of strings for autocomplete feature."
     )
+@guard_deco.rate_limit(requests=60, window=60)
 def get_all_exercises(
     session: SessionDep,
-    # search: Annotated[ str | None,
-    #     Query(min_length=2, max_length=100),
-    # ] = None,
-    # limit: Annotated[
-    #     int,
-    #     Query(ge=1, le=50),
-    # ] = 10,
 ) -> list[Exercise]:
     '''This route will be used by the autocomplete feature on the front end'''
     statement = select(Exercise)
-
-    # if search:
-    #     statement = statement.where(
-    #         Exercise.name.ilike(f'%{search}%')
-    #     )
-    # statement = statement.order_by(Exercise.name).limit(limit)
 
     exercises = session.exec(statement).all()
 
@@ -45,6 +39,7 @@ def get_all_exercises(
             status_code=status.HTTP_200_OK,
             description="Endpoint that additionally returns instructions as a list of strings" \
             "for a specific exercise id.")
+@guard_deco.rate_limit(requests=120, window=60)
 def get_exercise(
     exercise_id: int,
     session: SessionDep
