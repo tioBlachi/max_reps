@@ -110,7 +110,7 @@ def decode_access_token(token: str) -> UUID:
             SECRET_KEY,
             algorithms=[ALGORITHM],
             options={
-                'require' : ['sub', 'auth-version', 'iat', 'exp']
+                'require' : ['sub', 'auth_version', 'iat', 'exp']
             },
         )
 
