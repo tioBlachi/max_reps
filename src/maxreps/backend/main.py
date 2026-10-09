@@ -1,5 +1,11 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, status
 from guard import SecurityMiddleware
+from sqlmodel import Session
+
+from maxreps.backend.dependencies.db import engine
+from maxreps.services.bootstrap import ensure_admin_user
 from maxreps.services.security import config, guard_deco
 from maxreps.backend.routes.exercise import router as exercise_router
 from maxreps.backend.routes.user import router as user_router
@@ -7,8 +13,19 @@ from maxreps.backend.routes.lift_record import router as lift_record_router
 from maxreps.backend.routes.admin import router as admin_router
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Code before yield runs during startup. Alembic must have created the tables
+    # first (Docker Compose already applies migrations before launching Uvicorn).
+    with Session(engine) as session:
+        ensure_admin_user(session)
+    # The account is committed and the startup session closed before requests run.
+    yield
+
+
 app = FastAPI(
     description='The backend for the MaxReps applicaiton',
+    lifespan=lifespan,
 )
 
 app.include_router(exercise_router)

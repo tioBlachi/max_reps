@@ -41,6 +41,9 @@ services:
       ALGORITHM: ${ALGORITHM}
       ACCESS_TOKEN_EXPIRATION_MINUTES: ${ACCESS_TOKEN_EXPIRATION_MINUTES}
       APP_ENV: ${APP_ENV:-production}
+      # Required to create the first admin; later starts preserve the existing one.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
 
     ports:
       - "${FASTAPI_PORT}:8000"
