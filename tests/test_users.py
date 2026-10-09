@@ -417,7 +417,7 @@ def test_password_change_invalidates_old_tokens(client, session, registered_user
     )
 
     assert change_response.status_code == 204
-    assert change_response.content == b""
+    assert change_response.content == b"" # no bytes, that's what b is
 
     # Verify the new hash and incremented version were persisted.
     session.refresh(user)

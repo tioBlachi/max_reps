@@ -1,7 +1,9 @@
 from uuid import UUID, uuid4
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Index, text
 from pydantic import EmailStr
 
 if TYPE_CHECKING:
@@ -35,11 +37,32 @@ class UserDeactivate(SQLModel):
 
 class User(UserBase, table=True):
     __tablename__ = 'users'
+    __table_args__ = (
+        Index(
+            "uq_users_single_admin",
+            "is_admin",
+            unique=True,
+            postgresql_where=text("is_admin IS TRUE"),
+            sqlite_where=text("is_admin = 1"),
+        ),
+    )
     id : UUID = Field(default_factory=uuid4, primary_key=True)
     hashed_password : str
     is_active : bool = Field(default=True)
     is_admin : bool = Field(default=False)
     auth_version : int = Field(default=1, nullable=False)
+    registered_at : datetime | None = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        nullable=True
+    )
+    deactivated_at : datetime | None = Field(
+            default=None,
+            nullable=True
+        )
+    reactivated_at : datetime | None = Field(
+            default= None,
+            nullable=True
+        )
     lift_records: list["LiftRecord"] = Relationship(
         back_populates="user",
     )

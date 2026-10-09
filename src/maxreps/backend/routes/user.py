@@ -1,6 +1,7 @@
 """User registration, authentication, and self-service account routes."""
 
 from typing import Annotated
+from datetime import datetime, timezone
 
 from fastapi import (
     APIRouter,
@@ -259,6 +260,7 @@ def deactivate_user(
         )
         
     current_user.is_active = False
+    current_user.deactivated_at = datetime.now(timezone.utc)
     current_user.auth_version += 1
 
     session.add(current_user)
@@ -299,6 +301,7 @@ def reactivate_user(
         )
 
     user.is_active = True
+    user.reactivated_at = datetime.now(timezone.utc)
     session.add(user)
 
     try:
