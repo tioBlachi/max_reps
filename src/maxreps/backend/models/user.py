@@ -65,4 +65,5 @@ class User(UserBase, table=True):
         )
     lift_records: list["LiftRecord"] = Relationship(
         back_populates="user",
+        passive_deletes="all",
     )

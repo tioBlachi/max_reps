@@ -17,6 +17,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
+from sqlalchemy import event
 from sqlmodel import (
     Session,
     SQLModel,
@@ -32,6 +33,7 @@ from maxreps.backend.dependencies.db import get_session
 from maxreps.backend.routes.user import router as user_router
 from maxreps.backend.routes.exercise import router as exercise_router
 from maxreps.backend.routes.lift_record import router as lift_record_router
+from maxreps.backend.routes.admin import router as admin_router
 from maxreps.backend.models.exercise import Exercise
 from maxreps.backend.models.lift_record import LiftRecord
 from maxreps.backend.models.user import User
@@ -47,6 +49,15 @@ def session():
         connect_args={'check_same_thread': False},
         poolclass=StaticPool,
     )
+
+    # This enables foreign-key enforcement on every new sqlite connection
+    @event.listens_for(engine, 'connect')
+    def enable_foreign_keys(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cursor.close()
 
     # Build tables from models. This does NOT test Alembic migrations or Postgres.
     SQLModel.metadata.create_all(engine)
@@ -72,6 +83,7 @@ def client(session):
     app.include_router(user_router)
     app.include_router(exercise_router)
     app.include_router(lift_record_router)
+    app.include_router(admin_router)
 
     def override_get_session():
         # Replace only the database dependency, not authentication or handlers.
@@ -131,6 +143,27 @@ def auth_headers(client, registered_user):
     """Get a real login token; authentication is never overridden."""
     # data= sends form fields; json= would use the wrong login request format.
     response = client.post("/users/token", data=registered_user.credentials)
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+@pytest.fixture
+def admin_user(user_factory, session):
+    # Only test setup can grant this role; public registration cannot do so.
+    # Use a separate email so tests can also request a normal registered_user.
+    account = user_factory(email="admin@example.com")
+    account.user.is_admin = True
+    account.user.auth_version += 1
+    session.add(account.user)
+    session.commit()
+    return account
+
+
+@pytest.fixture
+def admin_headers(client, admin_user):
+    # Log in AFTER promotion to use the current auth_version. Do not override
+    # AdminUser: these tests must exercise the real permission dependency.
+    response = client.post("/users/token", data=admin_user.credentials)
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 

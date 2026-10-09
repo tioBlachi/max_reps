@@ -6,9 +6,101 @@
 
 from sqlmodel import select
 import pytest
+from datetime import datetime, timezone
 
 from maxreps.backend.models.user import User
 from maxreps.services.security import verify_password
+
+
+def test_registration_sets_server_timestamp(client, session):
+    # Supplying timestamp/status metadata must not override server-owned fields.
+    before = datetime.now(timezone.utc)
+    response = client.post("/users", json={
+        "email": "timestamps@example.com",
+        "password": "CorrectPassword123!",
+        "registered_at": "2000-01-01T00:00:00Z",
+        "deactivated_at": "2000-01-01T00:00:00Z",
+        "reactivated_at": "2000-01-01T00:00:00Z",
+    })
+    after = datetime.now(timezone.utc)
+    assert response.status_code == 201
+    user = session.exec(select(User).where(User.email == "timestamps@example.com")).one()
+    assert user.registered_at is not None
+    assert before <= user.registered_at.replace(tzinfo=timezone.utc) <= after
+    assert user.deactivated_at is None
+    assert user.reactivated_at is None
+
+
+def test_lifecycle_updates_latest_timestamp_and_preserves_history(
+    client, session, registered_user, auth_headers
+):
+    user = registered_user.user
+    registered_at = user.registered_at
+    previous_reactivation = None
+    headers = auth_headers
+
+    # Two cycles prove repeat operations update the latest event instead of
+    # clearing the other event or changing the original registration date.
+    for _ in range(2):
+        before = datetime.now(timezone.utc)
+        response = client.request(
+            "DELETE", "/users/me/deactivate", headers=headers,
+            json={"current_password": registered_user.password},
+        )
+        after = datetime.now(timezone.utc)
+        assert response.status_code == 204
+        session.refresh(user)
+        assert user.is_active is False
+        assert before <= user.deactivated_at.replace(tzinfo=timezone.utc) <= after
+        assert user.registered_at == registered_at
+        assert user.reactivated_at == previous_reactivation
+        deactivated_at = user.deactivated_at
+
+        before = datetime.now(timezone.utc)
+        response = client.post("/users/reactivate", data=registered_user.credentials)
+        after = datetime.now(timezone.utc)
+        assert response.status_code == 200
+        session.refresh(user)
+        assert user.is_active is True
+        assert before <= user.reactivated_at.replace(tzinfo=timezone.utc) <= after
+        assert user.deactivated_at == deactivated_at
+        assert user.registered_at == registered_at
+        previous_reactivation = user.reactivated_at
+        headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+@pytest.mark.parametrize("operation", ["deactivation", "reactivation", "password-change"])
+def test_rejected_lifecycle_requests_preserve_timestamps(
+    client, session, registered_user, auth_headers, operation
+):
+    user = registered_user.user
+    user.deactivated_at = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    user.reactivated_at = datetime(2026, 9, 2, tzinfo=timezone.utc)
+    if operation == "reactivation":
+        user.is_active = False
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    original = (user.registered_at, user.deactivated_at, user.reactivated_at,
+                user.auth_version, user.is_active, user.hashed_password)
+
+    if operation == "reactivation":
+        response = client.post("/users/reactivate", data={
+            "username": user.email, "password": "WrongPassword123!",
+        })
+        assert response.status_code == 401
+    else:
+        method, path = ("DELETE", "/users/me/deactivate") if operation == "deactivation" else (
+            "PATCH", "/users/me/password"
+        )
+        response = client.request(method, path, headers=auth_headers, json={
+            "current_password": "WrongPassword123!", "new_password": "NewPassword456!",
+        })
+        assert response.status_code == 403
+
+    session.refresh(user)
+    assert (user.registered_at, user.deactivated_at, user.reactivated_at,
+            user.auth_version, user.is_active, user.hashed_password) == original
 
 
 # Each parametrize row becomes its own test, with fresh fixture setup.

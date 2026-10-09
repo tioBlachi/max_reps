@@ -259,12 +259,22 @@ def deactivate_user(
             detail="Current password is incorrect",
         )
         
+    if current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin accounts cannot be deactivated",
+        )
+
     current_user.is_active = False
     current_user.deactivated_at = datetime.now(timezone.utc)
     current_user.auth_version += 1
 
     session.add(current_user)
-    session.commit()
+    try:
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        raise
 
 
 # ----------- REACTIVATE USER ----------------
