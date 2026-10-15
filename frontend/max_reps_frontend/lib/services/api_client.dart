@@ -86,7 +86,7 @@ Future<dynamic> postJson(
   // Send a POST request for form fields
   Future<dynamic> postForm(
     String path, {
-      required Map<String, dynamic> body,
+      required Map<String, String> body,
       String? token,
     }) async {
       final uri = Uri.parse(ApiConfig.baseUrl).resolve(path);
@@ -94,7 +94,7 @@ Future<dynamic> postJson(
       final response = await _client.post(
         uri,
         headers: {
-          'Accept': 'applicaiton/json',
+          'Accept': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',
         },
         body: body,
