@@ -11,6 +11,7 @@ import 'package:max_reps_frontend/services/auth_service.dart';
 import 'package:max_reps_frontend/services/exercise_service.dart';
 import 'package:max_reps_frontend/services/lift_record_service.dart';
 import 'package:max_reps_frontend/state/auth_state.dart';
+import 'package:max_reps_frontend/theme/app_theme.dart';
 
 // Use the real services with an in-memory HTTP client. These tests never access
 // the database or a running server, and can inspect the requests the page sends.
@@ -77,6 +78,7 @@ Future<AuthState> showHome(
 
   await tester.pumpWidget(
     MaterialApp(
+      theme: buildAppTheme(),
       home: HomePage(
         authState: auth,
         exerciseService: ExerciseService(client),
@@ -125,7 +127,10 @@ void main() {
     });
     expect(find.text('Latest saved 1RM'), findsOneWidget);
     expect(find.text('Estimated 1RM: 100.00 lb'), findsOneWidget);
-    expect(find.text('Attempted at: 10/01/2026 at 12:00 PM UTC'), findsOneWidget);
+    expect(
+      find.text('Attempted at: 10/01/2026 at 12:00 PM UTC'),
+      findsOneWidget,
+    );
     for (final percentage in [50, 60, 70, 80, 90]) {
       expect(find.text('$percentage%'), findsOneWidget);
       expect(find.text('${percentage.toStringAsFixed(2)} lb'), findsOneWidget);
@@ -252,8 +257,8 @@ void main() {
     await tester.tap(find.text('Calculate 1RM'));
     await tester.pumpAndSettle();
 
-    // One card is the refreshed saved estimate; the other is this visit's result.
-    expect(find.text('Estimated 1RM: 120.00 lb'), findsNWidgets(2));
+    // Refresh the saved card without duplicating the same record in the session.
+    expect(find.text('Estimated 1RM: 120.00 lb'), findsOneWidget);
     expect(find.text('Estimated 1RM: 100.00 lb'), findsNothing);
   });
 

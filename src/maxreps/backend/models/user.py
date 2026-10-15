@@ -19,6 +19,7 @@ class UserCreate(UserBase):
 
 class UserPublic(UserBase):
     id : UUID
+    is_admin: bool = False
 
 
 class UserEmailUpdate(SQLModel):

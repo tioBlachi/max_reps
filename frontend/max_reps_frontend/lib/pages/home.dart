@@ -9,6 +9,9 @@ import 'package:max_reps_frontend/services/api_client.dart';
 import 'package:max_reps_frontend/services/exercise_service.dart';
 import 'package:max_reps_frontend/services/lift_record_service.dart';
 import 'package:max_reps_frontend/state/auth_state.dart';
+import 'package:max_reps_frontend/theme/app_theme.dart';
+import 'package:max_reps_frontend/widgets/app_scaffold.dart';
+import 'package:max_reps_frontend/widgets/lift_estimate_card.dart';
 
 class HomePage extends StatefulWidget {
   final AuthState authState;
@@ -219,9 +222,11 @@ class _HomePageState extends State<HomePage> {
           return const Iterable<Exercise>.empty();
         }
 
-        return exercises.where((exercise) {
-          return exercise.name.toLowerCase().contains(query);
-        }).take(10);
+        return exercises
+            .where((exercise) {
+              return exercise.name.toLowerCase().contains(query);
+            })
+            .take(10);
       },
       onSelected: (exercise) {
         setState(() {
@@ -229,12 +234,7 @@ class _HomePageState extends State<HomePage> {
         });
         unawaited(_loadSavedRecord());
       },
-      fieldViewBuilder: (
-        context,
-        controller,
-        focusNode,
-        onFieldSubmitted,
-      ) {
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
         return TextFormField(
           controller: controller,
           focusNode: focusNode,
@@ -243,7 +243,7 @@ class _HomePageState extends State<HomePage> {
             labelText: 'Exercise',
             hintText: 'Start typing an exercise name',
             helperText: 'Choose an exercise from the suggestions.',
-            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.search_rounded),
           ),
           onFieldSubmitted: (_) => onFieldSubmitted(),
           onChanged: (_) {
@@ -266,113 +266,18 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  String _formatAttemptedAt(DateTime attemptedAt) {
-    final utc = attemptedAt.toUtc();
-    final month = utc.month.toString().padLeft(2, '0');
-    final day = utc.day.toString().padLeft(2, '0');
-    final minute = utc.minute.toString().padLeft(2, '0');
-    final period = utc.hour < 12 ? 'AM' : 'PM';
-    // In a 12-hour clock, midnight and noon both use 12 rather than 0.
-    final hour = utc.hour % 12 == 0 ? 12 : utc.hour % 12;
-
-    return '$month/$day/${utc.year} at $hour:$minute $period';
-  }
-
-  Widget _buildResultCard(
-    LiftRecord record,
-    String exerciseName, {
-    bool saved = false,
-  }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (saved) ...[
-              Text(
-                'Latest saved 1RM',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text('Attempted at: ${_formatAttemptedAt(record.attemptedAt)}'),
-              const SizedBox(height: 8),
-            ],
-            Text(
-              exerciseName,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${record.reps} reps at '
-              '${record.weight.toStringAsFixed(2)} ${record.unit}',
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Estimated 1RM: '
-              '${record.oneRepMaxEst.toStringAsFixed(2)} ${record.unit}',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPercentageCard(LiftRecord record) {
-    const percentages = [50, 60, 70, 80, 90];
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 24),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Percentages of estimated 1RM',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            // Calculate each percentage using the estimate returned by the API.
-            for (final percentage in percentages)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('$percentage%'),
-                    Text(
-                      '${(record.oneRepMaxEst * percentage / 100).toStringAsFixed(2)} '
-                      '${record.unit}',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildSavedEstimate(String exerciseName) {
     final record = _savedRecord;
     if (!_isLoadingSavedRecord && _savedRecordError == null && record != null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildResultCard(record, exerciseName, saved: true),
-          _buildPercentageCard(record),
-        ],
+      return LiftEstimateCard(
+        record: record,
+        exerciseName: exerciseName,
+        saved: true,
       );
     }
-
     return Card(
-      margin: const EdgeInsets.only(bottom: 24),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -380,11 +285,14 @@ class _HomePageState extends State<HomePage> {
               'Latest saved 1RM',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             if (_isLoadingSavedRecord)
               const Text('Loading your saved estimate...')
             else if (_savedRecordError != null) ...[
-              Text(_savedRecordError!),
+              Text(
+                _savedRecordError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
               TextButton(
                 onPressed: _isSubmitting ? null : _loadSavedRecord,
                 child: const Text('Retry saved estimate'),
@@ -397,202 +305,305 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildForm(List<Exercise> exercises) {
-    // Look up an exercise's display name using a saved record's ID.
-    final exerciseNames = <int, String>{
-      for (final exercise in exercises) exercise.id: exercise.name,
-    };
-
-    return Form(
-      key: _formKey,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Estimate your one-rep max',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 24),
-          _buildExerciseField(exercises),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _repsController,
-            enabled: !_isSubmitting,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'Repetitions',
-              border: OutlineInputBorder(),
+  Widget _buildForm(List<Exercise> exercises) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: AppColors.deepAqua,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Log a lift',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
             ),
-            validator: (value) {
-              final reps = int.tryParse(value?.trim() ?? '');
-
-              if (reps == null || reps <= 0) {
-                return 'Enter a whole number greater than zero.';
-              }
-
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _weightController,
-            enabled: !_isSubmitting,
-            keyboardType: const TextInputType.numberWithOptions(
-              decimal: true,
+            const SizedBox(height: 8),
+            const Text('A few details. A clearer picture of your strength.'),
+            const SizedBox(height: 24),
+            _buildExerciseField(exercises),
+            const SizedBox(height: 20),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _repsController,
+                    enabled: !_isSubmitting,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Repetitions',
+                      hintText: 'e.g. 5',
+                    ),
+                    validator: (value) {
+                      final reps = int.tryParse(value?.trim() ?? '');
+                      return reps == null || reps <= 0
+                          ? 'Enter a whole number greater than zero.'
+                          : null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    controller: _weightController,
+                    enabled: !_isSubmitting,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _submitLift(),
+                    decoration: const InputDecoration(
+                      labelText: 'Weight',
+                      hintText: 'e.g. 100',
+                    ),
+                    validator: (value) {
+                      final weight = double.tryParse(value?.trim() ?? '');
+                      return weight == null || !weight.isFinite || weight <= 0
+                          ? 'Enter a positive weight.'
+                          : null;
+                    },
+                  ),
+                ),
+              ],
             ),
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => _submitLift(),
-            decoration: const InputDecoration(
-              labelText: 'Weight',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) {
-              final weight = double.tryParse(value?.trim() ?? '');
-
-              if (weight == null || !weight.isFinite || weight <= 0) {
-                return 'Enter a positive weight, such as 100.5.';
-              }
-
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _unit,
-            decoration: const InputDecoration(
-              labelText: 'Unit',
-              border: OutlineInputBorder(),
-            ),
-            items: const [
-              DropdownMenuItem(
-                value: 'lb',
-                child: Text('Pounds (lb)'),
+            const SizedBox(height: 20),
+            DropdownButtonFormField<String>(
+              initialValue: _unit,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Unit',
+                prefixIcon: Icon(Icons.scale_outlined),
               ),
-              DropdownMenuItem(
-                value: 'kg',
-                child: Text('Kilograms (kg)'),
+              items: const [
+                DropdownMenuItem(value: 'lb', child: Text('Pounds (lb)')),
+                DropdownMenuItem(value: 'kg', child: Text('Kilograms (kg)')),
+              ],
+              onChanged: _isSubmitting
+                  ? null
+                  : (value) {
+                      if (value == null || value == _unit) return;
+                      setState(() {
+                        _unit = value;
+                      });
+                      unawaited(_loadSavedRecord());
+                    },
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ],
-            onChanged: _isSubmitting
-                ? null
-                : (value) {
-                    if (value == null) return;
-
-                    setState(() {
-                      _unit = value;
-                    });
-                    unawaited(_loadSavedRecord());
-                  },
-          ),
-          if (_errorMessage != null) ...[
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: _isSubmitting ? null : _submitLift,
+              icon: const Icon(Icons.bolt_rounded),
+              label: Text(_isSubmitting ? 'Calculating...' : 'Calculate 1RM'),
+            ),
             const SizedBox(height: 16),
-            Text(
-              _errorMessage!,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
+            const Text(
+              'Calculated using the Epley formula. Your result is an estimate, not a tested maximum.',
+              style: TextStyle(fontSize: 12, color: AppColors.muted),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _buildResults(List<Exercise> exercises) {
+    final exerciseNames = {
+      for (final exercise in exercises) exercise.id: exercise.name,
+    };
+    // The selected exercise's latest saved record already has a full result
+    // card. Avoid repeating it in the session list after a successful save.
+    final sessionRecords = _results
+        .where((record) => record.id != _savedRecord?.id)
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_selectedExerciseId != null)
+          _buildSavedEstimate(exerciseNames[_selectedExerciseId] ?? 'Exercise')
+        else
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 48),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE6F5F4),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.insights_rounded,
+                      size: 40,
+                      color: AppColors.deepAqua,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Your next best starts here.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Select an exercise to see your latest saved estimate, or log a lift to calculate a new one.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
-          ],
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: _isSubmitting ? null : _submitLift,
-            child: Text(
-              _isSubmitting ? 'Calculating...' : 'Calculate 1RM',
-            ),
           ),
-          if (_selectedExerciseId != null) ...[
-            const SizedBox(height: 24),
-            _buildSavedEstimate(
-              exerciseNames[_selectedExerciseId] ?? 'Exercise',
+        if (sessionRecords.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          Text('This session', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 12),
+          for (final record in sessionRecords)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: LiftEstimateCard(
+                record: record,
+                exerciseName: exerciseNames[record.exerciseId] ?? 'Exercise',
+              ),
             ),
-          ],
-          if (_results.isNotEmpty) ...[
-            const SizedBox(height: 32),
-            Text(
-              'Your results',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            ..._results.map((record) {
-              // Keep each result and its percentages together.
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildResultCard(
-                    record,
-                    exerciseNames[record.exerciseId] ?? 'Exercise',
-                  ),
-                  _buildPercentageCard(record),
-                ],
-              );
-            }),
-          ],
         ],
-      ),
+      ],
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('MaxReps'),
-        actions: [
-          TextButton(
-            onPressed:
-                _isSubmitting || widget.authState.isLoading
-                    ? null
-                    : widget.authState.logout,
-            child: const Text('Log out'),
-          ),
+  Widget _buildTrainingContent(List<Exercise> exercises) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (constraints.maxWidth < 860) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildForm(exercises),
+            const SizedBox(height: 24),
+            _buildResults(exercises),
+          ],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(flex: 4, child: _buildForm(exercises)),
+          const SizedBox(width: 28),
+          Expanded(flex: 5, child: _buildResults(exercises)),
         ],
-      ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 500),
-              child: FutureBuilder<List<Exercise>>(
+      );
+    },
+  );
+
+  @override
+  Widget build(BuildContext context) => AppScaffold(
+    authState: widget.authState,
+    busy: _isSubmitting,
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: AppColors.deepAqua,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'MAKE EVERY REP COUNT',
+                      style: TextStyle(
+                        color: Color(0xFFFFC086),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.6,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Every rep. A stronger you.',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.headlineLarge?.copyWith(color: Colors.white),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Estimate your one-rep max. Find your training weights. Build from here.',
+                      style: TextStyle(
+                        color: Color(0xFFD7EFED),
+                        fontSize: 16,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              FutureBuilder<List<Exercise>>(
                 future: _exercisesFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState != ConnectionState.done) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
+                    return const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(child: CircularProgressIndicator()),
                     );
                   }
-
                   if (snapshot.hasError) {
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('Could not load exercises.'),
-                        TextButton(
-                          onPressed: _retryExercises,
-                          child: const Text('Retry'),
+                    return Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            const Text('Could not load exercises.'),
+                            TextButton(
+                              onPressed: _retryExercises,
+                              child: const Text('Retry'),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     );
                   }
-
                   final exercises = snapshot.data ?? const <Exercise>[];
-
                   if (exercises.isEmpty) {
-                    return const Text('No exercises are available yet.');
+                    return const Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text('No exercises are available yet.'),
+                      ),
+                    );
                   }
-
-                  return _buildForm(exercises);
+                  return _buildTrainingContent(exercises);
                 },
               ),
-            ),
+              const SizedBox(height: 32),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 
   @override
   void dispose() {

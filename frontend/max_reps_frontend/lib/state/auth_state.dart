@@ -4,7 +4,8 @@ import 'package:max_reps_frontend/models/auth_token.dart';
 import 'package:max_reps_frontend/models/user.dart';
 import 'package:max_reps_frontend/services/auth_service.dart';
 
-class AuthState extends ChangeNotifier { // Pretty much used as an Event updater and broadcaster
+class AuthState extends ChangeNotifier {
+  // Pretty much used as an Event updater and broadcaster
   final AuthService _authService;
 
   AuthState(this._authService);
@@ -23,37 +24,22 @@ class AuthState extends ChangeNotifier { // Pretty much used as an Event updater
   bool get isAuthenticated => _token != null && _user != null;
 
   // Register an account. Registration does not log the user in.
-  Future<void> register({
-    required String email,
-    required String password,
-  }) {
+  Future<void> register({required String email, required String password}) {
     return _run(() async {
-      await _authService.register(
-        email: email,
-        password: password,
-      );
+      await _authService.register(email: email, password: password);
     });
   }
 
-  Future<void> login({
-    required String email,
-    required String password,
-  }) {
+  Future<void> login({required String email, required String password}) {
     return _run(() async {
-      final token = await _authService.login(
-        email: email,
-        password: password,
-      );
+      final token = await _authService.login(email: email, password: password);
 
       await _setSession(token);
     });
   }
 
   // The page calls this after the user confirms reactivation.
-  Future<void> reactivate({
-    required String email,
-    required String password,
-  }) {
+  Future<void> reactivate({required String email, required String password}) {
     return _run(() async {
       final token = await _authService.reactivate(
         email: email,
@@ -61,6 +47,22 @@ class AuthState extends ChangeNotifier { // Pretty much used as an Event updater
       );
 
       await _setSession(token);
+    });
+  }
+
+  Future<void> deactivate({required String currentPassword}) {
+    final token = accessToken;
+    if (token == null || _user?.isAdmin == true) {
+      throw StateError('This account cannot be deactivated.');
+    }
+    return _run(() async {
+      await _authService.deactivate(
+        accessToken: token,
+        currentPassword: currentPassword,
+      );
+      // Clear the session only after the server confirms deactivation.
+      _user = null;
+      _token = null;
     });
   }
 

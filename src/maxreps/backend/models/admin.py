@@ -24,3 +24,16 @@ class AdminStats(SQLModel):
     total_users: int
     active_users: int
     inactive_users: int
+
+
+class InactiveCleanupPreview(SQLModel):
+    eligible_users: int
+    cutoff_at: datetime
+
+
+class InactiveCleanupRequest(SQLModel):
+    cutoff_at: datetime
+
+
+class InactiveCleanupResult(SQLModel):
+    deleted_users: int

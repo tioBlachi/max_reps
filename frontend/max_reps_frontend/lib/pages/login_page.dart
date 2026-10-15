@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:max_reps_frontend/services/api_client.dart';
 import 'package:max_reps_frontend/state/auth_state.dart';
 import 'package:max_reps_frontend/pages/registration_page.dart';
+import 'package:max_reps_frontend/widgets/auth_layout.dart';
 
 class LoginPage extends StatefulWidget {
   // Receive the shared state created in app.dart.
@@ -29,6 +30,7 @@ class _LoginPageState extends State<LoginPage> {
 
   // Covers the entire interaction, including the reactivation dialog.
   bool _isSubmitting = false;
+  bool _hidePassword = true;
 
   Future<void> _submit() async {
     // Prevent duplicate submissions.
@@ -153,84 +155,94 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final isBusy = _isSubmitting || widget.authState.isLoading;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _emailController,
-                      enabled: !isBusy,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      autocorrect: false,
-                      decoration: const InputDecoration(labelText: 'Email'),
-                      validator: (value) {
-                        final email = value?.trim() ?? '';
-
-                        if (email.isEmpty) {
-                          return 'Enter your email address.';
-                        }
-
-                        if (!RegExp(
-                          r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                        ).hasMatch(email)) {
-                          return 'Enter a valid email address.';
-                        }
-
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordController,
-                      enabled: !isBusy,
-                      obscureText: true,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _submit(),
-                      decoration: const InputDecoration(labelText: 'Password'),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Enter your password.';
-                        }
-
-                        return null;
-                      },
-                    ),
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: isBusy ? null : _submit,
-                      child: Text(isBusy ? 'Signing in...' : 'Sign in'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: isBusy ? null : _openRegistration,
-                      child: const Text('Create an account'),
-                    ),
-                  ],
+    return AuthLayout(
+      title: 'Welcome back.',
+      subtitle: 'Sign in to pick up where you left off.',
+      child: AutofillGroup(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _emailController,
+                enabled: !isBusy,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autocorrect: false,
+                autofillHints: const [AutofillHints.username],
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.mail_outline_rounded),
                 ),
+                validator: (value) {
+                  final email = value?.trim() ?? '';
+
+                  if (email.isEmpty) {
+                    return 'Enter your email address.';
+                  }
+
+                  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+                    return 'Enter a valid email address.';
+                  }
+
+                  return null;
+                },
               ),
-            ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _passwordController,
+                enabled: !isBusy,
+                obscureText: _hidePassword,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _submit(),
+                autofillHints: const [AutofillHints.password],
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  suffixIcon: IconButton(
+                    tooltip: _hidePassword ? 'Show password' : 'Hide password',
+                    onPressed: isBusy
+                        ? null
+                        : () => setState(() {
+                            _hidePassword = !_hidePassword;
+                          }),
+                    icon: Icon(
+                      _hidePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Enter your password.';
+                  }
+
+                  return null;
+                },
+              ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: isBusy ? null : _submit,
+                child: Text(isBusy ? 'Signing in...' : 'Sign in'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: isBusy ? null : _openRegistration,
+                child: const Text('Create an account'),
+              ),
+            ],
           ),
         ),
       ),

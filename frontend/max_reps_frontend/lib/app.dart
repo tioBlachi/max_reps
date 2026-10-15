@@ -8,10 +8,15 @@ import 'package:max_reps_frontend/state/auth_state.dart';
 
 import 'package:max_reps_frontend/pages/login_page.dart';
 import 'package:max_reps_frontend/pages/home.dart';
+import 'package:max_reps_frontend/pages/admin_page.dart';
+import 'package:max_reps_frontend/services/admin_service.dart';
+import 'package:max_reps_frontend/theme/app_theme.dart';
 
 // The root widget owns the shared objects used by the application.
 class MainApp extends StatefulWidget {
-  const MainApp({super.key});
+  // Tests can provide an in-memory HTTP client. This root owns its lifetime.
+  final ApiClient? apiClient;
+  const MainApp({super.key, this.apiClient});
 
   @override
   State<MainApp> createState() => _MainAppState();
@@ -23,6 +28,7 @@ class _MainAppState extends State<MainApp> {
   late final AuthState _authState;
   late final ExerciseService _exerciseService;
   late final LiftRecordService _liftRecordService;
+  late final AdminService _adminService;
 
   @override
   void initState() {
@@ -30,9 +36,10 @@ class _MainAppState extends State<MainApp> {
 
     // Create the dependency chain:
     // ApiClient -> AuthService -> AuthState.
-    _apiClient = ApiClient();
+    _apiClient = widget.apiClient ?? ApiClient();
     _exerciseService = ExerciseService(_apiClient);
     _liftRecordService = LiftRecordService(_apiClient);
+    _adminService = AdminService(_apiClient);
 
     final authService = AuthService(_apiClient);
     _authState = AuthState(authService);
@@ -43,14 +50,19 @@ class _MainAppState extends State<MainApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'MaxReps',
+      theme: buildAppTheme(),
       home: ListenableBuilder(
         // Rebuild this section when AuthState calls notifyListeners().
         listenable: _authState,
         builder: (context, child) {
-          // These temporary contents keep the app runnable while
-          // we build the login and home pages.
           if (!_authState.isAuthenticated) {
             return LoginPage(authState: _authState);
+          }
+          if (_authState.user!.isAdmin) {
+            return AdminPage(
+              authState: _authState,
+              adminService: _adminService,
+            );
           }
           return HomePage(
             authState: _authState,
