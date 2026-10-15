@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, status
+from fastapi.middleware.cors import CORSMiddleware
 from guard import SecurityMiddleware
 from sqlmodel import Session
 
@@ -35,6 +36,13 @@ app.include_router(admin_router)
 
 
 app.add_middleware(SecurityMiddleware, config=config)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['http://localhost:3000'],
+    allow_methods=['GET', 'POST'],
+    allow_headers=['Content-Type', 'Authorization'],
+    allow_credentials=False,
+)
 
 app.state.guard_decorator = guard_deco
 

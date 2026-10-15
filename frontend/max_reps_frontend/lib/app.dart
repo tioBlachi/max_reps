@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'package:max_reps_frontend/services/api_client.dart';
 import 'package:max_reps_frontend/services/auth_service.dart';
+import 'package:max_reps_frontend/services/exercise_service.dart';
+import 'package:max_reps_frontend/services/lift_record_service.dart';
 import 'package:max_reps_frontend/state/auth_state.dart';
+
+import 'package:max_reps_frontend/pages/login_page.dart';
+import 'package:max_reps_frontend/pages/home.dart';
 
 // The root widget owns the shared objects used by the application.
 class MainApp extends StatefulWidget {
@@ -16,6 +21,8 @@ class _MainAppState extends State<MainApp> {
   // Initialized once in initState and retained across widget rebuilds.
   late final ApiClient _apiClient;
   late final AuthState _authState;
+  late final ExerciseService _exerciseService;
+  late final LiftRecordService _liftRecordService;
 
   @override
   void initState() {
@@ -24,6 +31,8 @@ class _MainAppState extends State<MainApp> {
     // Create the dependency chain:
     // ApiClient -> AuthService -> AuthState.
     _apiClient = ApiClient();
+    _exerciseService = ExerciseService(_apiClient);
+    _liftRecordService = LiftRecordService(_apiClient);
 
     final authService = AuthService(_apiClient);
     _authState = AuthState(authService);
@@ -32,6 +41,7 @@ class _MainAppState extends State<MainApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'MaxReps',
       home: ListenableBuilder(
         // Rebuild this section when AuthState calls notifyListeners().
@@ -39,26 +49,13 @@ class _MainAppState extends State<MainApp> {
         builder: (context, child) {
           // These temporary contents keep the app runnable while
           // we build the login and home pages.
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('MaxReps'),
-              actions: [
-                if (_authState.isAuthenticated)
-                  TextButton(
-                    // Disable logout during an authentication operation.
-                    onPressed:
-                        _authState.isLoading ? null : _authState.logout,
-                    child: const Text('Log out'),
-                  ),
-              ],
-            ),
-            body: Center(
-              child: Text(
-                _authState.isAuthenticated
-                    ? 'Signed in as ${_authState.user?.email}'
-                    : 'Login page goes here.',
-              ),
-            ),
+          if (!_authState.isAuthenticated) {
+            return LoginPage(authState: _authState);
+          }
+          return HomePage(
+            authState: _authState,
+            exerciseService: _exerciseService,
+            liftRecordService: _liftRecordService,
           );
         },
       ),
