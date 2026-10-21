@@ -12,6 +12,69 @@ from maxreps.backend.models.user import User
 from maxreps.services.security import verify_password
 
 
+@pytest.mark.parametrize('email', [
+    'test@example.com', 'TEST@EXAMPLE.COM', '  test@example.com  ',
+])
+def test_unchanged_email_is_rejected_without_modifying_account(
+    client, session, registered_user, auth_headers, email,
+):
+    user = registered_user.user
+    original = (user.email, user.hashed_password, user.auth_version)
+    response = client.patch('/users/me/email', headers=auth_headers, json={
+        'email': email, 'current_password': registered_user.password,
+    })
+    assert response.status_code == 400
+    assert response.json()['detail'] == 'New email must be different from your current email.'
+    session.refresh(user)
+    assert (user.email, user.hashed_password, user.auth_version) == original
+    assert client.get('/users/me', headers=auth_headers).status_code == 200
+
+
+def test_unchanged_password_is_rejected_without_rehashing_or_revoking_session(
+    client, session, registered_user, auth_headers,
+):
+    user = registered_user.user
+    original_hash, original_version = user.hashed_password, user.auth_version
+    response = client.patch('/users/me/password', headers=auth_headers, json={
+        'current_password': registered_user.password,
+        'new_password': registered_user.password,
+    })
+    assert response.status_code == 400
+    assert response.json()['detail'] == 'New password must be different from your current password.'
+    session.refresh(user)
+    assert user.hashed_password == original_hash
+    assert user.auth_version == original_version
+    assert client.get('/users/me', headers=auth_headers).status_code == 200
+
+
+@pytest.mark.parametrize('field', ['email', 'password'])
+def test_current_password_is_verified_before_rejecting_unchanged_details(
+    client, registered_user, auth_headers, field,
+):
+    body = {'current_password': 'WrongPassword123!'}
+    body.update({'email': registered_user.user.email} if field == 'email' else {
+        'new_password': 'WrongPassword123!',
+    })
+    response = client.patch(f'/users/me/{field}', headers=auth_headers, json=body)
+    assert response.status_code == 403
+    assert response.json()['detail'] == 'Current password is incorrect'
+
+
+@pytest.mark.parametrize('change', ['case', 'trailing-space'])
+def test_password_comparison_preserves_case_and_spaces(
+    client, session, registered_user, auth_headers, change,
+):
+    old_password = registered_user.password
+    new_password = old_password.lower() if change == 'case' else old_password + ' '
+    response = client.patch('/users/me/password', headers=auth_headers, json={
+        'current_password': old_password, 'new_password': new_password,
+    })
+    assert response.status_code == 204
+    session.refresh(registered_user.user)
+    assert verify_password(new_password, registered_user.user.hashed_password)
+    assert not verify_password(old_password, registered_user.user.hashed_password)
+
+
 def test_registration_sets_server_timestamp(client, session):
     # Supplying timestamp/status metadata must not override server-owned fields.
     before = datetime.now(timezone.utc)

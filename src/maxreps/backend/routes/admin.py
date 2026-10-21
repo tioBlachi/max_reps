@@ -1,5 +1,6 @@
 from typing import Annotated
 from uuid import UUID
+from datetime import datetime, timedelta, timezone
 
 from fastapi import (
     APIRouter,
@@ -7,7 +8,7 @@ from fastapi import (
     Query,
     status,
 )
-from sqlalchemy import func
+from sqlalchemy import delete, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select
 
@@ -17,6 +18,9 @@ from maxreps.backend.models.admin import (
     AdminStats,
     AdminUserList,
     AdminUserPublic,
+    InactiveCleanupPreview,
+    InactiveCleanupRequest,
+    InactiveCleanupResult,
 )
 from maxreps.backend.models.user import User
 from maxreps.services.security import (
@@ -29,6 +33,90 @@ router = APIRouter(
     prefix='/admin',
     tags=['Admin']
 )
+
+
+def _inactive_cleanup_cutoff() -> datetime:
+    return datetime.now(timezone.utc) - timedelta(days=90)
+
+
+def _inactive_cleanup_conditions(cutoff: datetime):
+    # SQL comparisons exclude NULL dates. Check current status as well as age:
+    # reactivated accounts must survive even if they retain an old timestamp.
+    return (
+        User.is_active.is_(False),
+        User.is_admin.is_(False),
+        User.deactivated_at <= cutoff,
+    )
+
+
+@router.get(
+    '/inactive-users/cleanup',
+    response_model=InactiveCleanupPreview,
+    description=(
+        'Previews the number of regular accounts inactive for at least 90 days. '
+        'Uses the latest deactivated_at timestamp in UTC; accounts with no date '
+        'are excluded. Requires an authenticated active admin. '
+        'Rate limited to 30 requests per minute.'
+    ),
+)
+@guard_deco.rate_limit(requests=30, window=60)
+def preview_inactive_cleanup(
+    session: SessionDep,
+    current_admin: AdminUser,
+) -> InactiveCleanupPreview:
+    cutoff = _inactive_cleanup_cutoff()
+    count = session.exec(
+        select(func.count(User.id)).where(*_inactive_cleanup_conditions(cutoff))
+    ).one()
+    return InactiveCleanupPreview(eligible_users=count, cutoff_at=cutoff)
+
+
+@router.delete(
+    '/inactive-users/cleanup',
+    response_model=InactiveCleanupResult,
+    description=(
+        'Permanently deletes eligible inactive regular accounts and their lift '
+        'records. Send the UTC cutoff_at returned by the preview; it must be '
+        'at least 90 days ago. Eligibility is rechecked during deletion. '
+        'Admin accounts, active accounts, and accounts with no deactivation date '
+        'are preserved. Requires an authenticated active admin. '
+        'Rate limited to 5 requests per 10 minutes in production and '
+        '5 requests per minute during development.'
+    ),
+)
+@guard_deco.rate_limit(requests=5, window=rate_window(600))
+def cleanup_inactive_users(
+    cleanup: InactiveCleanupRequest,
+    session: SessionDep,
+    current_admin: AdminUser,
+) -> InactiveCleanupResult:
+    cutoff = cleanup.cutoff_at
+    if cutoff.utcoffset() is None:
+        cutoff = cutoff.replace(tzinfo=timezone.utc)
+    else:
+        cutoff = cutoff.astimezone(timezone.utc)
+    if cutoff > _inactive_cleanup_cutoff():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail='The cleanup cutoff must be at least 90 days ago',
+        )
+
+    try:
+        # A single conditional DELETE rechecks status in the database, rather
+        # than deleting IDs from a potentially stale preview. The existing FK
+        # cascade removes only these accounts' lift records in this transaction.
+        result = session.execute(
+            delete(User)
+            .where(*_inactive_cleanup_conditions(cutoff))
+            .execution_options(synchronize_session=False)
+        )
+        deleted_users = result.rowcount
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+
+    return InactiveCleanupResult(deleted_users=deleted_users)
 
 #------------USER STATS-------------
 @router.get(

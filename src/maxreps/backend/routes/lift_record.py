@@ -19,8 +19,10 @@ from maxreps.services.utils import (
     from_kilograms,
 )
 from sqlmodel import select
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from maxreps.backend.models.exercise import Exercise
+from maxreps.backend.models.exercise import ExerciseSummary
 from maxreps.backend.dependencies.db import SessionDep
 from maxreps.backend.dependencies.auth import CurrentUser
 from maxreps.backend.models.enums import WeightUnit
@@ -151,6 +153,33 @@ def get_lift_records(
     records = session.exec(statement).all() # returns a list of lift records
 
     return [to_public(record, unit) for record in records]
+
+
+# ---------- EXERCISES IN THE CURRENT USER'S HISTORY -------------
+@router.get(
+    '/exercises',
+    response_model=list[ExerciseSummary],
+    description=(
+        "Returns only exercises logged by the authenticated active user, "
+        "ordered by their most recent attempt. Each exercise appears once. "
+        "Returns an empty list when the user has no lift records.\n\n"
+        "Rate limited to:\n\n"
+        "- 60 requests per minute in production\n"
+        "- 60 requests per minute during development"
+    ),
+)
+@guard_deco.rate_limit(requests=60, window=60)
+def get_logged_exercises(session: SessionDep, current_user: CurrentUser) -> list[Exercise]:
+    # Query distinct exercises on the server instead of downloading all of a
+    # user's lift records to populate the Training Zone's autocomplete.
+    statement = (
+        select(Exercise)
+        .join(LiftRecord, LiftRecord.exercise_id == Exercise.id)
+        .where(LiftRecord.user_id == current_user.id)
+        .group_by(Exercise.id)
+        .order_by(func.max(LiftRecord.attempted_at).desc(), Exercise.id.desc())
+    )
+    return session.exec(statement).all()
 
 
 # ---------- GET A SINGLE LIFT RECORD BY ID -------------

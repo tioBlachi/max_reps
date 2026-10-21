@@ -5,13 +5,20 @@ import 'package:http/http.dart' as http;
 
 import 'package:max_reps_frontend/services/api_client.dart';
 import 'package:max_reps_frontend/state/auth_state.dart';
-import 'package:max_reps_frontend/pages/registration_page.dart';
+import 'package:max_reps_frontend/widgets/auth_layout.dart';
 
 class LoginPage extends StatefulWidget {
   // Receive the shared state created in app.dart.
   final AuthState authState;
+  final VoidCallback onRegister;
+  final String? registeredEmail;
 
-  const LoginPage({super.key, required this.authState});
+  const LoginPage({
+    super.key,
+    required this.authState,
+    required this.onRegister,
+    this.registeredEmail,
+  });
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -29,6 +36,25 @@ class _LoginPageState extends State<LoginPage> {
 
   // Covers the entire interaction, including the reactivation dialog.
   bool _isSubmitting = false;
+  bool _hidePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final email = widget.registeredEmail;
+    if (email == null) return;
+    // Registration passes this in memory, keeping email addresses out of URLs.
+    _emailController.text = email;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created. Sign in to continue.'),
+          ),
+        );
+      }
+    });
+  }
 
   Future<void> _submit() async {
     // Prevent duplicate submissions.
@@ -51,8 +77,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await _loginOrReactivate(email, password);
 
-      // No navigation here: app.dart listens to AuthState and
-      // replaces this page after authentication succeeds.
+      // The router reacts to AuthState and opens the requested destination.
     } catch (error) {
       // The page might have been removed while awaiting a request.
       if (!mounted) return;
@@ -77,32 +102,9 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _openRegistration() async {
+  void _openRegistration() {
     if (_isSubmitting || widget.authState.isLoading) return;
-
-    // Push registration onto the navigation stack and wait for its result.
-    final registeredEmail = await Navigator.of(context).push<String>(
-      MaterialPageRoute<String>(
-        builder: (context) {
-          return RegistrationPage(authState: widget.authState);
-        },
-      ),
-    );
-
-    // Going back without registering returns null.
-    if (!mounted || registeredEmail == null) return;
-
-    // Prefill the newly registered email and clear the old password.
-    _emailController.text = registeredEmail;
-    _passwordController.clear();
-
-    setState(() {
-      _errorMessage = null;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account created. Sign in to continue.')),
-    );
+    widget.onRegister();
   }
 
   Future<void> _loginOrReactivate(String email, String password) async {
@@ -153,84 +155,94 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final isBusy = _isSubmitting || widget.authState.isLoading;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _emailController,
-                      enabled: !isBusy,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      autocorrect: false,
-                      decoration: const InputDecoration(labelText: 'Email'),
-                      validator: (value) {
-                        final email = value?.trim() ?? '';
-
-                        if (email.isEmpty) {
-                          return 'Enter your email address.';
-                        }
-
-                        if (!RegExp(
-                          r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                        ).hasMatch(email)) {
-                          return 'Enter a valid email address.';
-                        }
-
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordController,
-                      enabled: !isBusy,
-                      obscureText: true,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _submit(),
-                      decoration: const InputDecoration(labelText: 'Password'),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Enter your password.';
-                        }
-
-                        return null;
-                      },
-                    ),
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: isBusy ? null : _submit,
-                      child: Text(isBusy ? 'Signing in...' : 'Sign in'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: isBusy ? null : _openRegistration,
-                      child: const Text('Create an account'),
-                    ),
-                  ],
+    return AuthLayout(
+      title: 'Welcome back.',
+      subtitle: 'Sign in to pick up where you left off.',
+      child: AutofillGroup(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _emailController,
+                enabled: !isBusy,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autocorrect: false,
+                autofillHints: const [AutofillHints.username],
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.mail_outline_rounded),
                 ),
+                validator: (value) {
+                  final email = value?.trim() ?? '';
+
+                  if (email.isEmpty) {
+                    return 'Enter your email address.';
+                  }
+
+                  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+                    return 'Enter a valid email address.';
+                  }
+
+                  return null;
+                },
               ),
-            ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _passwordController,
+                enabled: !isBusy,
+                obscureText: _hidePassword,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _submit(),
+                autofillHints: const [AutofillHints.password],
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  suffixIcon: IconButton(
+                    tooltip: _hidePassword ? 'Show password' : 'Hide password',
+                    onPressed: isBusy
+                        ? null
+                        : () => setState(() {
+                            _hidePassword = !_hidePassword;
+                          }),
+                    icon: Icon(
+                      _hidePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Enter your password.';
+                  }
+
+                  return null;
+                },
+              ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: isBusy ? null : _submit,
+                child: Text(isBusy ? 'Signing in...' : 'Sign in'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: isBusy ? null : _openRegistration,
+                child: const Text('Create an account'),
+              ),
+            ],
           ),
         ),
       ),
