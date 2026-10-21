@@ -1,0 +1,105 @@
+name: Backend CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # GitHub creates fresh PostgreSQL and Redis containers for this job.
+    # Their data is discarded when the job ends.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: maxreps_ci
+          POSTGRES_PASSWORD: ci_database_password
+          POSTGRES_DB: maxreps_ci
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U maxreps_ci -d maxreps_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:8
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # These credentials are exclusively for disposable CI services.
+    # Your personal .env file and real accounts are not used.
+    env:
+      DATABASE_URL: postgresql+psycopg://maxreps_ci:ci_database_password@127.0.0.1:5432/maxreps_ci
+      REDIS_URL: redis://127.0.0.1:6379/15
+      SECRET_KEY: ci-only-signing-key-not-for-real-deployments
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRATION_MINUTES: "30"
+      APP_ENV: test
+      ADMIN_EMAIL: ci-admin@example.com
+      ADMIN_PASSWORD: CIAdminPassword123!
+      API_BASE_URL: http://127.0.0.1:18000
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@v10
+        with:
+          version: "0.13.4"
+          python-version: "3.14"
+          enable-cache: true
+
+      - name: Install locked dependencies
+        run: uv sync --locked
+
+      - name: Run existing backend tests
+        run: uv run --frozen pytest tests -q
+
+      # This checks whether a completely empty PostgreSQL database
+      # can be constructed using your actual migration history.
+      - name: Apply database migrations
+        run: uv run --frozen alembic upgrade head
+
+      - name: Seed exercise catalog
+        run: uv run --frozen python scripts/seed_exercise_db.py
+
+      # Run actual application, including startup, authentication,
+      # database dependencies, and Guard middleware.
+      - name: Start API
+        run: |
+          uv run --frozen uvicorn maxreps.backend.main:app \
+            --host 127.0.0.1 \
+            --port 18000 \
+            > api.log 2>&1 &
+
+      - name: Run integration tests
+        env:
+          RUN_INTEGRATION_TESTS: "1"
+        run: uv run --frozen pytest integration_tests -q
+
+      - name: Verify Docker image builds
+        run: docker build --tag maxreps-backend:ci .
+
+      # If startup or a test fails, include the server output
+      # in the workflow logs to help diagnose the failure.
+      - name: Show API logs on failure
+        if: failure()
+        run: |
+          if [ -f api.log ]; then
+            cat api.log
+          fi

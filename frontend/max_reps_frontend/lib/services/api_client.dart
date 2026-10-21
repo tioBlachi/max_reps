@@ -105,8 +105,25 @@ class ApiClient {
     return _handleResponse(response);
   }
 
-  // DELETE endpoints may accept JSON, such as password confirmation or a
-  // previewed cleanup cutoff. A successful 204 response is handled as null.
+  Future<dynamic> patchJson(
+    String path, {
+    required String token,
+    required Map<String, dynamic> body,
+  }) async {
+    final response = await _client
+        .patch(
+          Uri.parse(ApiConfig.baseUrl).resolve(path),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(ApiConfig.requestTimeout);
+    return _handleResponse(response);
+  }
+
   Future<dynamic> delete(
     String path, {
     required String token,

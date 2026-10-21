@@ -5,14 +5,20 @@ import 'package:http/http.dart' as http;
 
 import 'package:max_reps_frontend/services/api_client.dart';
 import 'package:max_reps_frontend/state/auth_state.dart';
-import 'package:max_reps_frontend/pages/registration_page.dart';
 import 'package:max_reps_frontend/widgets/auth_layout.dart';
 
 class LoginPage extends StatefulWidget {
   // Receive the shared state created in app.dart.
   final AuthState authState;
+  final VoidCallback onRegister;
+  final String? registeredEmail;
 
-  const LoginPage({super.key, required this.authState});
+  const LoginPage({
+    super.key,
+    required this.authState,
+    required this.onRegister,
+    this.registeredEmail,
+  });
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -31,6 +37,24 @@ class _LoginPageState extends State<LoginPage> {
   // Covers the entire interaction, including the reactivation dialog.
   bool _isSubmitting = false;
   bool _hidePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final email = widget.registeredEmail;
+    if (email == null) return;
+    // Registration passes this in memory, keeping email addresses out of URLs.
+    _emailController.text = email;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created. Sign in to continue.'),
+          ),
+        );
+      }
+    });
+  }
 
   Future<void> _submit() async {
     // Prevent duplicate submissions.
@@ -53,8 +77,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await _loginOrReactivate(email, password);
 
-      // No navigation here: app.dart listens to AuthState and
-      // replaces this page after authentication succeeds.
+      // The router reacts to AuthState and opens the requested destination.
     } catch (error) {
       // The page might have been removed while awaiting a request.
       if (!mounted) return;
@@ -79,32 +102,9 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _openRegistration() async {
+  void _openRegistration() {
     if (_isSubmitting || widget.authState.isLoading) return;
-
-    // Push registration onto the navigation stack and wait for its result.
-    final registeredEmail = await Navigator.of(context).push<String>(
-      MaterialPageRoute<String>(
-        builder: (context) {
-          return RegistrationPage(authState: widget.authState);
-        },
-      ),
-    );
-
-    // Going back without registering returns null.
-    if (!mounted || registeredEmail == null) return;
-
-    // Prefill the newly registered email and clear the old password.
-    _emailController.text = registeredEmail;
-    _passwordController.clear();
-
-    setState(() {
-      _errorMessage = null;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account created. Sign in to continue.')),
-    );
+    widget.onRegister();
   }
 
   Future<void> _loginOrReactivate(String email, String password) async {

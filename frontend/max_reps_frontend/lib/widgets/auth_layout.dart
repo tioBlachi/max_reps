@@ -8,6 +8,7 @@ class AuthLayout extends StatelessWidget {
   final String subtitle;
   final Widget child;
   final bool canGoBack;
+  final VoidCallback? onBack;
 
   const AuthLayout({
     super.key,
@@ -15,6 +16,7 @@ class AuthLayout extends StatelessWidget {
     required this.subtitle,
     required this.child,
     this.canGoBack = false,
+    this.onBack,
   });
 
   @override
@@ -46,7 +48,9 @@ class AuthLayout extends StatelessWidget {
                           if (canGoBack) ...[
                             IconButton(
                               tooltip: 'Back to sign in',
-                              onPressed: () => Navigator.of(context).maybePop(),
+                              onPressed:
+                                  onBack ??
+                                  () => Navigator.of(context).maybePop(),
                               icon: const Icon(Icons.arrow_back_rounded),
                             ),
                             const SizedBox(width: 8),

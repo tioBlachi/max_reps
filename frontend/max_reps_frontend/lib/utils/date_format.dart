@@ -8,3 +8,14 @@ String formatUsUtc(DateTime value) {
   final period = utc.hour < 12 ? 'AM' : 'PM';
   return '$month/$day/${utc.year} at $hour:$minute $period UTC';
 }
+
+String formatUsLocal(DateTime value) {
+  final local = value.toLocal();
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final period = local.hour < 12 ? 'AM' : 'PM';
+
+  return '$month/$day/${local.year} at $hour:$minute $period';
+}

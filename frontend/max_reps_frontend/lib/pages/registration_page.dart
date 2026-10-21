@@ -9,8 +9,15 @@ import 'package:max_reps_frontend/widgets/auth_layout.dart';
 
 class RegistrationPage extends StatefulWidget {
   final AuthState authState;
+  final ValueChanged<String> onRegistered;
+  final VoidCallback onBack;
 
-  const RegistrationPage({super.key, required this.authState});
+  const RegistrationPage({
+    super.key,
+    required this.authState,
+    required this.onRegistered,
+    required this.onBack,
+  });
 
   @override
   State<RegistrationPage> createState() => _RegistrationPageState();
@@ -51,8 +58,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
       // If the user already went back, don't pop another page.
       if (ModalRoute.of(context)?.isCurrent != true) return;
 
-      // Close registration and return the email to the login page.
-      Navigator.of(context).pop(email);
+      // Return to the login URL, prefilling the email without storing a password.
+      widget.onRegistered(email);
     } catch (error) {
       if (!mounted) return;
 
@@ -88,6 +95,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       title: 'Start your next chapter.',
       subtitle: 'Create an account. Find your numbers. Keep building.',
       canGoBack: !isBusy,
+      onBack: widget.onBack,
       child: AutofillGroup(
         child: Form(
           key: _formKey,

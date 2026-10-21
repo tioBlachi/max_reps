@@ -8,7 +8,7 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 
 engine = create_engine(
     url=DATABASE_URL,
-    echo=True
+    echo=False
     )
 
 def get_session():

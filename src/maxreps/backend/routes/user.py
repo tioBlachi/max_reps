@@ -55,7 +55,6 @@ router = APIRouter(
     ),
     
 )
-@guard_deco.require_ip(whitelist=['127.0.0.1', '172.18.0.1'])
 @guard_deco.rate_limit(requests=3, window=rate_window(3600))
 def register_user(session: SessionDep, user_data: UserCreate) -> User:
     normalized_email = str(user_data.email).strip().lower()
@@ -151,7 +150,8 @@ def get_my_profile(current_user: CurrentUser) -> User:
     response_model=UserPublic,
     description=(
         "Updates the current user's email address after validating their current password "
-        "and verifying that the new email is not already registered.\n\n"
+        "and verifying that the new email differs from the current email and is not "
+        "already registered.\n\n"
         "Rate limited to:\n\n"
         "- 5 requests per 10 minutes in production\n"
         "- 5 requests per minute during development"
@@ -173,6 +173,12 @@ def update_user_email(
         )
 
     new_email = str(update_data.email).strip().lower()
+    if new_email == str(current_user.email).strip().lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New email must be different from your current email.",
+        )
+
     email_owner = session.exec(
         select(User).where(User.email == new_email)
     ).first()
@@ -204,7 +210,8 @@ def update_user_email(
     "/me/password",
     status_code=status.HTTP_204_NO_CONTENT,
     description=(
-        "Updates the current user's password after validating their current password.\n\n"
+        "Updates the current user's password after validating their current password "
+        "and checking that the new password is different.\n\n"
         "Rate limited to:\n\n"
         "- 5 requests per 10 minutes in production\n"
         "- 5 requests per minute during development"
@@ -223,6 +230,14 @@ def update_user_password(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Current password is incorrect",
+        )
+
+    # The current password was verified above. Compare exactly: spaces and
+    # letter case are meaningful parts of a password and must not be normalized.
+    if update_data.new_password == update_data.current_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from your current password.",
         )
 
     current_user.hashed_password = get_password_hash(update_data.new_password)

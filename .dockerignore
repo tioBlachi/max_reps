@@ -1,0 +1,35 @@
+# Secrets and local environment configuration
+.env
+.env.*
+!.env.example
+
+# Git metadata
+.git
+.github
+
+# Local Python environments
+.venv
+venv
+**/.venv
+
+# Generated Python files
+**/__pycache__
+**/*.pyc
+**/*.pyo
+.pytest_cache
+.coverage
+htmlcov
+
+# Local tooling and notes
+.vscode
+.idea
+notes
+.DS_Store
+
+# Generated packages
+build
+dist
+**/*.egg-info
+
+# The frontend is deployed separately from this backend image
+frontend

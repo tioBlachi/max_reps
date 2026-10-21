@@ -35,15 +35,16 @@ services:
       dockerfile: Dockerfile
 
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?Set POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: ${SECRET_KEY}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
       ALGORITHM: ${ALGORITHM}
-      ACCESS_TOKEN_EXPIRATION_MINUTES: ${ACCESS_TOKEN_EXPIRATION_MINUTES}
-      APP_ENV: ${APP_ENV:-production}
+      ACCESS_TOKEN_EXPIRATION_MINUTES: ${ACCESS_TOKEN_EXPIRATION_MINUTES:-30}
+      APP_ENV: ${APP_ENV:-development} # Change to production and change CORS origin to the deployment platform after choosing one
       # Required to create the first admin; later starts preserve the existing one.
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      CORS_ORIGIN: ${CORS_ORIGINS:-http://localhost:3000} # See comment on APP_ENV line
 
     ports:
       - "${FASTAPI_PORT}:8000"

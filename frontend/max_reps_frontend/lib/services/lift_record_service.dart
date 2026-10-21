@@ -1,10 +1,22 @@
 import 'package:max_reps_frontend/models/lift_record.dart';
+import 'package:max_reps_frontend/models/exercise.dart';
 import 'package:max_reps_frontend/services/api_client.dart';
 
 class LiftRecordService {
   final ApiClient _apiClient;
 
   LiftRecordService(this._apiClient);
+
+  Future<List<Exercise>> getLoggedExercises({
+    required String accessToken,
+  }) async {
+    final data =
+        await _apiClient.get('/lift_record/exercises', token: accessToken)
+            as List<dynamic>;
+    return data
+        .map((item) => Exercise.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
 
   // Save a lift and receive the backend's calculated result.
   Future<LiftRecord> createLiftRecord({
@@ -55,8 +67,7 @@ class LiftRecordService {
         'limit': limit.toString(),
 
         // Omit this parameter when no exercise filter was supplied.
-        if (exerciseId != null)
-          'exercise_id': exerciseId.toString(),
+        if (exerciseId != null) 'exercise_id': exerciseId.toString(),
       },
     );
 

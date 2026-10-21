@@ -43,7 +43,32 @@ class AuthService {
     return User.fromJson(data as Map<String, dynamic>);
   }
 
-  // Deactivation verifies the current password and revokes the user's tokens.
+  // Account changes require the user's current password.
+  Future<User> updateEmail({
+    required String accessToken,
+    required String email,
+    required String currentPassword,
+  }) async {
+    final data = await _apiClient.patchJson(
+      '/users/me/email',
+      token: accessToken,
+      body: {'email': email, 'current_password': currentPassword},
+    );
+    return User.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> updatePassword({
+    required String accessToken,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _apiClient.patchJson(
+      '/users/me/password',
+      token: accessToken,
+      body: {'current_password': currentPassword, 'new_password': newPassword},
+    );
+  }
+
   Future<void> deactivate({
     required String accessToken,
     required String currentPassword,
