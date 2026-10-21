@@ -55,7 +55,6 @@ router = APIRouter(
     ),
     
 )
-@guard_deco.require_ip(whitelist=['127.0.0.1', '172.18.0.1'])
 @guard_deco.rate_limit(requests=3, window=rate_window(3600))
 def register_user(session: SessionDep, user_data: UserCreate) -> User:
     normalized_email = str(user_data.email).strip().lower()

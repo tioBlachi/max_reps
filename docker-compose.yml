@@ -40,10 +40,11 @@ services:
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
       ALGORITHM: ${ALGORITHM}
       ACCESS_TOKEN_EXPIRATION_MINUTES: ${ACCESS_TOKEN_EXPIRATION_MINUTES:-30}
-      APP_ENV: ${APP_ENV:-production}
+      APP_ENV: ${APP_ENV:-development} # Change to production and change CORS origin to the deployment platform after choosing one
       # Required to create the first admin; later starts preserve the existing one.
       ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      CORS_ORIGIN: ${CORS_ORIGINS:-http://localhost:3000} # See comment on APP_ENV line
 
     ports:
       - "${FASTAPI_PORT}:8000"
