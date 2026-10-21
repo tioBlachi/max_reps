@@ -29,6 +29,7 @@ class LiftRecordPublic(LiftRecordBase):
     weight: float
     unit: WeightUnit
     one_rep_max_est: float
+    is_recent: bool
 
 
 class LiftRecord(LiftRecordBase, table=True):

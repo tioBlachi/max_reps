@@ -1,6 +1,6 @@
 from typing import Annotated
 from uuid import UUID
-from datetime import timezone
+from datetime import timezone, datetime, timedelta
 
 from fastapi import (
     APIRouter,
@@ -28,6 +28,8 @@ from maxreps.backend.dependencies.auth import CurrentUser
 from maxreps.backend.models.enums import WeightUnit
 from maxreps.services.security import guard_deco
 
+ESTIMATE_FRESHNES_DAYS = 30
+
 
 router = APIRouter(
     prefix='/lift_record',
@@ -37,6 +39,16 @@ router = APIRouter(
 
 # ---------- HELPERS ------------------------
 def to_public(record: LiftRecord, unit: WeightUnit)-> LiftRecordPublic:
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=ESTIMATE_FRESHNES_DAYS)
+
+    attempted_at = record.attempted_at
+
+    if attempted_at.utcoffset() is None:
+        attempted_at = attempted_at.replace(tzinfo=timezone.utc)
+    else:
+        attempted_at = attempted_at.astimezone(timezone.utc)
+
     return LiftRecordPublic(
         id=record.id,
         user_id=record.user_id,
@@ -49,6 +61,7 @@ def to_public(record: LiftRecord, unit: WeightUnit)-> LiftRecordPublic:
             from_kilograms(record.one_rep_max_est, unit),
             2,
         ),
+        is_recent=cutoff <= attempted_at <= now,
     ) 
 
 
